@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo Biocápsula</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fa-solid fa-seedling"></i> Biocápsula IoT
+        </div>
+        <ul class="nav-links">
+            <li><a href="#" class="active">Inicio</a></li>
+            <li><a href="#">Gráficas y Historial</a></li>
+            <li><a href="#">Configuración</a></li>
+        </ul>
+        <div class="nav-info">
+            <span>📅 12 de octubre de 2026 | 06:51 P. M.</span>
+            <div class="user-avatar"><i class="fa-solid fa-user"></i></div>
+        </div>
+    </nav>
+
+    <header class="dashboard-header">
+        <h1>Monitoreo Biocápsula</h1>
+        <p>Lecturas en tiempo real de variables ambientales con DHT22</p>
+    </header>
+
+    <main class="dashboard-container">
+        
+        <!-- Estado del Sistema / Actuador -->
+        <div class="card small-card">
+            <div class="card-title">
+                <i class="fa-solid fa-fan"></i> Estado del Sistema / Actuador
+            </div>
+            <div class="card-value red">
+                <span class="dot-led"></span> DESCONECTADO
+            </div>
+            <div class="card-subtitle">Control por relé</div>
+        </div>
+
+        <!-- Sección de Sensores -->
+        <div class="bottom-section-single">
+            
+            <!-- Temperatura y Humedad Ambiente (DHT22) -->
+            <div class="card large-card wide-card">
+                <div class="card-title"><i class="fa-solid fa-temperature-half"></i> Sensor DHT22 (Temperatura y Humedad)</div>
+                <div class="card-value-large">27.7 <span class="unit">°C</span> / 45% <span class="unit">Humedad</span></div>
+                <div class="card-footer-text">≈ Interior de la Biocápsula</div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="system-status">
+        <span>⏱️ Última actualización:</span>
+        <span class="alert-text">⚠️ ESP32 fuera de línea | Esperando conexión del sensor...</span>
+    </footer>
+
+</body>
+</html>
