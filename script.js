@@ -1,9 +1,6 @@
 // Función que consulta al ESP32 cada 3 segundos
 async function obtenerDatosESP32() {
     try {
-        // ⚠️ AQUÍ CAMBIAS LA IP:
-        // Borra 'http://192.168.1.X/datos' y pon la IP real que te dio el Monitor Serie de Arduino.
-        // Ejemplo: 'http://192.168.1.50/datos'
         let respuesta = await fetch('http://192.168.1.X/datos');
         let datos = await respuesta.json();
 
@@ -14,6 +11,9 @@ async function obtenerDatosESP32() {
         if (elementoSensor) {
             // Actualizamos la pantalla con los datos reales del DHT22
             elementoSensor.innerHTML = `${datos.temperatura} <span class="unit">°C</span> / ${datos.humedad}% <span class="unit">Humedad</span>`;
+            
+            // Y aquí agregamos la línea para actualizar la presión del BMP280
+            document.getElementById('presion').innerText = datos.presion;
         }
 
         if (estadoSistema) {
