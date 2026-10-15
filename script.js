@@ -14,6 +14,12 @@ async function obtenerDatosESP32() {
             
             // Y aquí agregamos la línea para actualizar la presión del BMP280
             document.getElementById('presion').innerText = datos.presion;
+
+            // Actualizar la pantalla con los datos reales del MHZ-19
+            document.getElementById('CO2').innerText = datos.CO2;
+
+            //Actualizar la Pantalla con los datos reales del Flotador
+             document.getElementById('Nivel de Agua').innerText = datos.Nivel de Agua;
         }
 
         if (estadoSistema) {
