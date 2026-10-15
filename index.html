@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <!-- Librería para las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Librería para exportar a Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitoreo Biocápsula</title>
@@ -14,9 +18,9 @@
             <i class="fa-solid fa-seedling"></i> Biocápsula IoT
         </div>
         <ul class="nav-links">
-            <li><a href="#" class="active">Inicio</a></li>
-            <li><a href="#">Gráficas y Historial</a></li>
-            <li><a href="#">Configuración</a></li>
+            <li><a href="#" onclick="mostrarSeccion(event, 'inicio')" id="btn-inicio" class="active">Inicio</a></li>
+            <li><a href="#" onclick="mostrarSeccion(event, 'graficas')" id="btn-graficas">Gráficas y Historial</a></li>
+            <li><a href="#" onclick="event.preventDefault();">Configuración</a></li>
         </ul>
         <div class="nav-info">
             <span>📅 12 de octubre de 2026 | 06:51 P. M.</span>
@@ -24,64 +28,161 @@
         </div>
     </nav>
 
-    <header class="dashboard-header">
-        <h1>Monitoreo Biocápsula</h1>
-        <p>Lecturas en tiempo real de variables ambientales con DHT22</p>
-    </header>
+    <!-- SECCIÓN 1: INICIO (Sensores en tiempo real) -->
+    <div id="seccion-inicio" style="display: block;">
+        <header class="dashboard-header">
+            <h1>Monitoreo Biocápsula</h1>
+            <p>Lecturas en tiempo real de variables ambientales con DHT22</p>
+        </header>
 
-    <main class="dashboard-container">
-        
-        <!-- Estado del Sistema / Actuador -->
-        <div class="card small-card">
-            <div class="card-title">
-                <i class="fa-solid fa-fan"></i> Estado del Sistema / Actuador
+        <main class="dashboard-container">
+            <!-- Estado del Sistema / Actuador -->
+            <div class="card small-card">
+                <div class="card-title">
+                    <i class="fa-solid fa-fan"></i> Estado del Sistema / Actuador
+                </div>
+                <div class="card-value red">
+                    <span class="dot-led"></span> DESCONECTADO
+                </div>
+                <div class="card-subtitle">Control por relé</div>
             </div>
-            <div class="card-value red">
-                <span class="dot-led"></span> DESCONECTADO
-            </div>
-            <div class="card-subtitle">Control por relé</div>
-        </div>
 
-        <!-- Sección de Sensores -->
-        <div class="bottom-section-single">
+            <!-- Sección de Sensores -->
+            <div class="bottom-section-single">
+                
+                <!-- Temperatura y Humedad Ambiente (DHT22) -->
+                <div class="card large-card wide-card">
+                    <div class="card-title"><i class="fa-solid fa-temperature-half"></i> Sensor DHT22 (Temperatura y Humedad)</div>
+                    <div class="card-value-large">27.7 <span class="unit">°C</span> / 45% <span class="unit">Humedad</span></div>
+                    <div class="card-footer-text">≈ Interior de la Biocápsula</div>
+                </div>
+
+                <!-- Sensor BMP280 (Presión Atmosférica) -->
+                <div class="card large-card wide-card">
+                    <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor BMP280 (Presión Atmosférica)</div>
+                    <div class="card-value-large"><span id="presion">--</span> <span class="unit">hPa</span></div>
+                    <div class="card-footer-text">Exterior / Ambiente</div>
+                </div>
+
+                <!-- Sensor MHZ-19 (Dioxido de Carbono (CO2)) -->
+                <div class="card large-card wide-card">
+                    <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor MHZ-19 (Dioxido de Carbono (CO2))</div>
+                    <div class="card-value-large"><span id="CO2">--</span> <span class="unit">CO2</span></div>
+                    <div class="card-footer-text">Interior de la Biocápsula</div>
+                </div>
+
+                <!-- Sensor de Humedad de Sustrato -->
+                <div class="card large-card wide-card">
+                    <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor Humedad de Sustrato</div>
+                    <div class="card-value-large"><span id="sustrato">--</span> <span class="unit">%</span></div>
+                    <div class="card-footer-text">Interior y Exterior del Hongo</div>
+                </div>
+
+                <!-- Sensor Flotador (Nivel de Agua) -->
+                <div class="card large-card wide-card">
+                    <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor Flotador (Nivel de agua)</div>
+                    <div class="card-value-large"><span id="nivel_agua">--</span> <span class="unit">%</span></div>
+                    <div class="card-footer-text">Deposito de Agua de la Biocápsula</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SECCIÓN 2: GRÁFICAS E HISTORIAL (Oculta por defecto) -->
+    <div id="seccion-graficas" style="display: none; padding: 20px;">
+        <div class="card large-card wide-card" style="margin: 0 auto; max-width: 1000px;">
+            <div class="card-title"><i class="fa-solid fa-chart-line"></i> Historial y Gráficas en Tiempo Real</div>
             
-            <!-- Temperatura y Humedad Ambiente (DHT22) -->
-            <div class="card large-card wide-card">
-                <div class="card-title"><i class="fa-solid fa-temperature-half"></i> Sensor DHT22 (Temperatura y Humedad)</div>
-                <div class="card-value-large">27.7 <span class="unit">°C</span> / 45% <span class="unit">Humedad</span></div>
-                <div class="card-footer-text">≈ Interior de la Biocápsula</div>
+            <!-- Contenedor del gráfico -->
+            <div style="position: relative; height:350px; width:100%; margin-bottom: 20px;">
+                <canvas id="graficaSensores"></canvas>
             </div>
-            <!-- Sensor BMP280 (Presión Atmosférica) -->
-            <div class="card large-card wide-card">
-            <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor BMP280 (Presión Atmosférica)</div>
-            <div class="card-value-large"><span id="presion">--</span> <span class="unit">hPa</span></div>
-            <div class="card-footer-text">Exterior / Ambiente</div>
+
+            <!-- Botón para descargar reporte en Excel -->
+            <button onclick="descargarExcel()" style="background-color: #22c55e; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                <i class="fa-solid fa-file-excel"></i> Descargar Reporte en Excel
+            </button>
         </div>
-        <!-- Sensor MHZ-19 (Dioxido de Carbono (CO2)) -->
-            <div class="card large-card wide-card">
-            <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor MHZ-19 (Dioxido de Carbono (CO2))</div>
-            <div class="card-value-large"><span id="CO2">--</span> <span class="unit">CO2</span></div>
-            <div class="card-footer-text">Interior de la Biocápsula</div>
-        </div>
-               <!-- Sensor de Humedad de Sustrato (Humedad de Sustrato) -->
-            <div class="card large-card wide-card">
-            <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor MHZ-19 (Humedad de Sustrato)</div>
-            <div class="card-value-large"><span id="Humedad de Sustrato">--</span> <span class="unit">Humedad de Sustrato</span></div>
-            <div class="card-footer-text">Interior y Exterior del Hongo</div>
-        </div>
-          <!-- Sensor Flotador- (Nivel de Agua) -->
-            <div class="card large-card wide-card">
-            <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor Flotador (Nivel de agua)</div>
-            <div class="card-value-large"><span id="Nivel de Agua">--</span> <span class="unit">Nivel de Agua</span></div>
-            <div class="card-footer-text">Deposito de Agua de la Biocápsula</div>
-        </div>
-        </div>
-    </main>
+    </div>
 
     <footer class="system-status">
         <span>⏱️ Última actualización:</span>
         <span class="alert-text">⚠️ ESP32 fuera de línea | Esperando conexión del sensor...</span>
     </footer>
 
+<!-- Script para configurar la gráfica con puntos, escala de 0 a 50 y tiempo -->
+    <script>
+        let miGrafica = null; // Variable global para la gráfica
+
+        function mostrarSeccion(event, seccion) {
+            event.preventDefault();
+
+            const inicio = document.getElementById('seccion-inicio');
+            const graficas = document.getElementById('seccion-graficas');
+            const btnInicio = document.getElementById('btn-inicio');
+            const btnGraficas = document.getElementById('btn-graficas');
+
+            if (seccion === 'inicio') {
+                inicio.style.display = 'block';
+                graficas.style.display = 'none';
+                if (btnInicio) btnInicio.classList.add('active');
+                if (btnGraficas) btnGraficas.classList.remove('active');
+            } else if (seccion === 'graficas') {
+                inicio.style.display = 'none';
+                graficas.style.display = 'block';
+                if (btnGraficas) btnGraficas.classList.add('active');
+                if (btnInicio) btnInicio.classList.remove('active');
+                
+                // Crear o actualizar la gráfica
+                if (!miGrafica) {
+                    const canvasElement = document.getElementById('graficaSensores');
+                    if (canvasElement) {
+                        const ctx = canvasElement.getContext('2d');
+                        miGrafica = new Chart(ctx, {
+                            type: 'line', // Tipo línea pero configurado para mostrar puntos claros
+                            data: {
+                                labels: typeof historialTiempos !== 'undefined' ? historialTiempos : [],
+                                datasets: [
+                                    { 
+                                        label: 'Temperatura (°C)', 
+                                        data: typeof datosTemperatura !== 'undefined' ? datosTemperatura : [], 
+                                        borderColor: '#ef4444', 
+                                        backgroundColor: '#ef4444',
+                                        borderWidth: 2,
+                                        pointRadius: 5,        // Tamaño visible de los puntos en cada medición
+                                        pointHoverRadius: 7,   // Tamaño al pasar el cursor
+                                        fill: false,
+                                        tension: 0.1 
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: { 
+                                        min: 0,   // Límite mínimo del eje Y
+                                        max: 50,  // Límite máximo del eje Y (0 a 50 grados)
+                                        ticks: {
+                                            stepSize: 10 // Marcas cada 10 grados
+                                        }
+                                    },
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Tiempo (Registro por minuto / intervalos)'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    miGrafica.resize();
+                    miGrafica.update();
+                }
+            }
+        }
+    </script>
 </body>
 </html>
