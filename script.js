@@ -1,7 +1,7 @@
 // ==========================================
 // CONFIGURACIÓN DE TELEGRAM Y VARIABLES DE CONTROL
 // ==========================================
-const TELEGRAM_TOKEN = '8891713299:AAGjm9TDaZFtmL-7WNW-FNfVQHTY6rZ0mkl';
+const TELEGRAM_TOKEN = '8620659886:AAEcuwTUANMMKITa79-mEPejzX_aMoBtWv4';
 const TELEGRAM_CHAT_ID = '8872216506';
 
 // Variables de monitoreo
