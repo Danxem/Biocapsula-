@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <!-- Librería para las gráficas -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Librería para exportar a Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -28,7 +26,6 @@
         </div>
     </nav>
 
-    <!-- SECCIÓN 1: INICIO (Sensores en tiempo real) -->
     <div id="seccion-inicio" style="display: block;">
         <header class="dashboard-header">
             <h1>Monitoreo Biocápsula</h1>
@@ -36,7 +33,6 @@
         </header>
 
         <main class="dashboard-container">
-            <!-- Estado del Sistema / Actuador -->
             <div class="card small-card">
                 <div class="card-title">
                     <i class="fa-solid fa-fan"></i> Estado del Sistema / Actuador
@@ -47,38 +43,31 @@
                 <div class="card-subtitle">Control por relé</div>
             </div>
 
-            <!-- Sección de Sensores -->
             <div class="bottom-section-single">
-                
-                <!-- Temperatura y Humedad Ambiente (DHT22) -->
                 <div class="card large-card wide-card">
                     <div class="card-title"><i class="fa-solid fa-temperature-half"></i> Sensor DHT22 (Temperatura y Humedad)</div>
                     <div class="card-value-large">27.7 <span class="unit">°C</span> / 45% <span class="unit">Humedad</span></div>
                     <div class="card-footer-text">≈ Interior de la Biocápsula</div>
                 </div>
 
-                <!-- Sensor BMP280 (Presión Atmosférica) -->
                 <div class="card large-card wide-card">
                     <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor BMP280 (Presión Atmosférica)</div>
                     <div class="card-value-large"><span id="presion">--</span> <span class="unit">hPa</span></div>
                     <div class="card-footer-text">Exterior / Ambiente</div>
                 </div>
 
-                <!-- Sensor MHZ-19 (Dioxido de Carbono (CO2)) -->
                 <div class="card large-card wide-card">
                     <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor MHZ-19 (Dioxido de Carbono (CO2))</div>
                     <div class="card-value-large"><span id="CO2">--</span> <span class="unit">CO2</span></div>
                     <div class="card-footer-text">Interior de la Biocápsula</div>
                 </div>
 
-                <!-- Sensor de Humedad de Sustrato -->
                 <div class="card large-card wide-card">
                     <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor Humedad de Sustrato</div>
                     <div class="card-value-large"><span id="sustrato">--</span> <span class="unit">%</span></div>
                     <div class="card-footer-text">Interior y Exterior del Hongo</div>
                 </div>
 
-                <!-- Sensor Flotador (Nivel de Agua) -->
                 <div class="card large-card wide-card">
                     <div class="card-title"><i class="fa-solid fa-gauge"></i> Sensor Flotador (Nivel de agua)</div>
                     <div class="card-value-large"><span id="nivel_agua">--</span> <span class="unit">%</span></div>
@@ -88,17 +77,12 @@
         </main>
     </div>
 
-    <!-- SECCIÓN 2: GRÁFICAS E HISTORIAL (Oculta por defecto) -->
     <div id="seccion-graficas" style="display: none; padding: 20px;">
         <div class="card large-card wide-card" style="margin: 0 auto; max-width: 1000px;">
             <div class="card-title"><i class="fa-solid fa-chart-line"></i> Historial y Gráficas en Tiempo Real</div>
-            
-            <!-- Contenedor del gráfico -->
             <div style="position: relative; height:350px; width:100%; margin-bottom: 20px;">
                 <canvas id="graficaSensores"></canvas>
             </div>
-
-            <!-- Botón para descargar reporte en Excel -->
             <button onclick="descargarExcel()" style="background-color: #22c55e; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
                 <i class="fa-solid fa-file-excel"></i> Descargar Reporte en Excel
             </button>
@@ -110,13 +94,42 @@
         <span class="alert-text">⚠️ ESP32 fuera de línea | Esperando conexión del sensor...</span>
     </footer>
 
-<!-- Script para configurar la gráfica con puntos, escala de 0 a 50 y tiempo -->
     <script>
-        let miGrafica = null; // Variable global para la gráfica
+        // CONFIGURACIÓN DE TELEGRAM
+        const TELEGRAM_TOKEN = '8891713299:AAGWAmKa-DnSrLsQavp4-Ww7IjEvuGbWXM0';
+        const TELEGRAM_CHAT_ID = '8872216506';
+
+        let ultimaTemperatura = null;
+        let ultimaHoraTemperatura = Date.now();
+        let ultimoTiempoLectura = Date.now();
+        let alertaDesconexionEnviada = false;
+
+        function enviarAlertaTelegram(mensaje) {
+            const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(mensaje)}`;
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.ok) {
+                        console.log('✅ Alerta enviada a Telegram con éxito');
+                    } else {
+                        console.error('❌ Error Telegram:', data.description);
+                    }
+                })
+                .catch(err => console.error('❌ Error de red:', err));
+        }
+
+        let historialTiempos = [];
+        let datosTemperatura = [];
+        let datosHumedad = [];
+        let datosPresion = [];
+        let datosNivelAgua = [];
+        let datosHumedadSustrato = [];
+        let datosCO2 = [];
+        let miGrafica = null;
 
         function mostrarSeccion(event, seccion) {
             event.preventDefault();
-
             const inicio = document.getElementById('seccion-inicio');
             const graficas = document.getElementById('seccion-graficas');
             const btnInicio = document.getElementById('btn-inicio');
@@ -133,48 +146,24 @@
                 if (btnGraficas) btnGraficas.classList.add('active');
                 if (btnInicio) btnInicio.classList.remove('active');
                 
-                // Crear o actualizar la gráfica
                 if (!miGrafica) {
                     const canvasElement = document.getElementById('graficaSensores');
                     if (canvasElement) {
                         const ctx = canvasElement.getContext('2d');
                         miGrafica = new Chart(ctx, {
-                            type: 'line', // Tipo línea pero configurado para mostrar puntos claros
+                            type: 'line',
                             data: {
-                                labels: typeof historialTiempos !== 'undefined' ? historialTiempos : [],
+                                labels: historialTiempos,
                                 datasets: [
-                                    { 
-                                        label: 'Temperatura (°C)', 
-                                        data: typeof datosTemperatura !== 'undefined' ? datosTemperatura : [], 
-                                        borderColor: '#ef4444', 
-                                        backgroundColor: '#ef4444',
-                                        borderWidth: 2,
-                                        pointRadius: 5,        // Tamaño visible de los puntos en cada medición
-                                        pointHoverRadius: 7,   // Tamaño al pasar el cursor
-                                        fill: false,
-                                        tension: 0.1 
-                                    }
+                                    { label: 'Temperatura (°C)', data: datosTemperatura, borderColor: '#ef4444', tension: 0.1 },
+                                    { label: 'Humedad (%)', data: datosHumedad, borderColor: '#3b82f6', tension: 0.1 },
+                                    { label: 'Presión (hPa)', data: datosPresion, borderColor: '#8b5cf6', tension: 0.1 },
+                                    { label: 'Nivel Agua (%)', data: datosNivelAgua, borderColor: '#06b6d4', tension: 0.1 },
+                                    { label: 'Humedad Sustrato (%)', data: datosHumedadSustrato, borderColor: '#10b981', tension: 0.1 },
+                                    { label: 'CO2 (ppm)', data: datosCO2, borderColor: '#f59e0b', tension: 0.1 }
                                 ]
                             },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                scales: {
-                                    y: { 
-                                        min: 0,   // Límite mínimo del eje Y
-                                        max: 50,  // Límite máximo del eje Y (0 a 50 grados)
-                                        ticks: {
-                                            stepSize: 10 // Marcas cada 10 grados
-                                        }
-                                    },
-                                    x: {
-                                        title: {
-                                            display: true,
-                                            text: 'Tiempo (Registro por minuto / intervalos)'
-                                        }
-                                    }
-                                }
-                            }
+                            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
                         });
                     }
                 } else {
@@ -183,8 +172,29 @@
                 }
             }
         }
+
+        function descargarExcel() {
+            if (historialTiempos.length === 0) {
+                alert("No hay datos registrados todavía para exportar.");
+                return;
+            }
+            let datosParaExcel = [];
+            for (let i = 0; i < historialTiempos.length; i++) {
+                datosParaExcel.push({
+                    "Hora": historialTiempos[i],
+                    "Temperatura (°C)": datosTemperatura[i],
+                    "Humedad (%)": datosHumedad[i],
+                    "Presión (hPa)": datosPresion[i],
+                    "Nivel de Agua (%)": datosNivelAgua[i],
+                    "Humedad Sustrato (%)": datosHumedadSustrato[i],
+                    "CO2 (ppm)": datosCO2[i]
+                });
+            }
+            let hoja = XLSX.utils.json_to_sheet(datosParaExcel);
+            let libro = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(libro, hoja, "Historial Sensores");
+            XLSX.writeFile(libro, "Reporte_Biocapsula_Sensores.xlsx");
+        }
     </script>
-    <!-- AQUÍ ESTABA EL DETALLE: Enlazar tu archivo script.js externo -->
-    <script src="script.js"></script>
 </body>
 </html>
