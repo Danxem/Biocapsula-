@@ -1,4 +1,34 @@
-// Arreglos para almacenar el historial de datos y la gráfica
+// ==========================================
+// CONFIGURACIÓN DE TELEGRAM Y VARIABLES DE CONTROL
+// ==========================================
+const TELEGRAM_TOKEN = '8891713299:AAGWAmKa-DnSrLsQavp4-Ww7IjEvuGbWXM0';
+const TELEGRAM_CHAT_ID = '8872216506';
+
+// Variables de monitoreo
+let ultimaTemperatura = null;
+let ultimaHoraTemperatura = Date.now();
+let ultimoTiempoLectura = Date.now();
+let alertaDesconexionEnviada = false;
+
+// Función para enviar alertas a Telegram
+function enviarAlertaTelegram(mensaje) {
+    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(mensaje)}`;
+    
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (data.ok) {
+                console.log('✅ Alerta enviada a Telegram con éxito');
+            } else {
+                console.error('❌ Error Telegram:', data.description);
+            }
+        })
+        .catch(err => console.error('❌ Error de red al contactar a Telegram:', err));
+}
+
+// ==========================================
+// ESTRUCTURA DE LA GRÁFICA DE CHART.JS
+// ==========================================
 let historialTiempos = [];
 let datosTemperatura = [];
 let datosHumedad = [];
@@ -7,7 +37,6 @@ let datosNivelAgua = [];
 let datosHumedadSustrato = [];
 let datosCO2 = [];
 
-// Variable global para la instancia de Chart.js
 let miGrafica;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -36,15 +65,44 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // Primera lectura al cargar la página
+    obtenerDatosESP32();
 });
 
-// Función que consulta al ESP32 cada 3 segundos
+// ==========================================
+// CONSULTA AL ESP32 Y MONITOREO DE TEMPERATURA
+// ==========================================
 async function obtenerDatosESP32() {
     try {
         let respuesta = await fetch('http://192.168.1.X/datos'); // Cambia por la IP de tu ESP32
         let datos = await respuesta.json();
 
-        // Actualizar tarjetas visuales existentes en el inicio
+        const ahora = Date.now();
+        ultimoTiempoLectura = ahora;
+        alertaDesconexionEnviada = false; // Resetear bandera de desconexión si volvió la señal
+
+        // --- VERIFICACIÓN DE INCREMENTO REPENTINO DE TEMPERATURA ---
+        let tempActual = parseFloat(datos.temperatura);
+        if (!isNaN(tempActual)) {
+            if (ultimaTemperatura !== null) {
+                const diferenciaTemp = tempActual - ultimaTemperatura;
+                const minutosTranscurridos = (ahora - ultimaHoraTemperatura) / 60000;
+
+                // Si la temperatura sube 3°C o más en menos de 2 minutos
+                if (diferenciaTemp >= 3.0 && minutosTranscurridos <= 2) {
+                    enviarAlertaTelegram(
+                        `🚨 ¡ALERTA BIOCÁPSULA!\n` +
+                        `Incremento repentino de temperatura: +${diferenciaTemp.toFixed(1)}°C\n` +
+                        `Temperatura actual: ${tempActual}°C`
+                    );
+                }
+            }
+            ultimaTemperatura = tempActual;
+            ultimaHoraTemperatura = ahora;
+        }
+
+        // --- ACTUALIZAR TARJETAS EN EL HTML ---
         const elementoSensor = document.querySelector('.card-value-large');
         const estadoSistema = document.querySelector('.alert-text');
 
@@ -105,7 +163,25 @@ async function obtenerDatosESP32() {
     }
 }
 
-// Función para exportar el historial acumulado a un archivo Excel (.xlsx)
+// ==========================================
+// DETECCIÓN AUTOMÁTICA DE PÉRDIDA DE CONEXIÓN
+// ==========================================
+setInterval(() => {
+    const tiempoSinDatosSegundos = (Date.now() - ultimoTiempoLectura) / 1000;
+
+    // Si pasan más de 60 segundos sin recibir respuesta del ESP32
+    if (tiempoSinDatosSegundos > 60 && !alertaDesconexionEnviada) {
+        enviarAlertaTelegram(
+            `⚠️ ¡ALERTA BIOCÁPSULA!\n` +
+            `Se ha perdido la conexión con el ESP32. No se han recibido datos en más de 1 minuto.`
+        );
+        alertaDesconexionEnviada = true; // Para enviar una sola alerta mientras siga desconectado
+    }
+}, 30000);
+
+// ==========================================
+// EXPORTAR A EXCEL
+// ==========================================
 function descargarExcel() {
     if (historialTiempos.length === 0) {
         alert("No hay datos registrados todavía para exportar.");
@@ -132,5 +208,5 @@ function descargarExcel() {
     XLSX.writeFile(libro, "Reporte_Biocapsula_Sensores.xlsx");
 }
 
-// Ejecutar la función cada 1 minuto de manera continua
+// Consultar datos del ESP32 cada 60 segundos
 setInterval(obtenerDatosESP32, 60000);
