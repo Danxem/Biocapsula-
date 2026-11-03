@@ -1,3 +1,4 @@
+
 // ==========================================
 // CONFIGURACIÓN DE LA BIOCÁPSULA
 // ==========================================
@@ -6,24 +7,39 @@
 // false = Conexión real con el ESP32
 const MODO_SIMULACION = true;
 
-// Dirección del ESP32 (cambiar cuando tengas el dispositivo)
+// Dirección del ESP32
 const ESP32_URL = 'http://192.168.1.X/datos';
 
-// Dirección de un futuro servidor seguro para Telegram.
-// No colocar aquí el token del bot.
-const TELEGRAM_ENDPOINT = "";
+// Servidor seguro para enviar mensajes a Telegram
+// Se configurará cuando preparemos el servidor
+const TELEGRAM_ENDPOINT = "https://biocapsula-alertas.dcastanon80.workers.dev/";
+
+// Límites ambientales
+const TEMPERATURA_MINIMA = 21;
+const TEMPERATURA_MAXIMA = 27;
+const HUMEDAD_DESEADA = 95;
 
 // Variables de monitoreo
 let ultimaTemperatura = null;
-let ultimaHoraTemperatura = Date.now();
+let ultimaHoraTemperatura = null;
 let ultimoTiempoLectura = Date.now();
 let alertaDesconexionEnviada = false;
+
+// Control para evitar alertas repetidas
+let alertasActivas = {
+    temperaturaBaja: false,
+    temperaturaAlta: false,
+    humedadBaja: false,
+    humedadAlta: false,
+    cambioRepentino: false
+};
 
 // ==========================================
 // ENVÍO DE ALERTAS A TELEGRAM
 // ==========================================
 
 async function enviarAlertaTelegram(mensaje) {
+
     if (!TELEGRAM_ENDPOINT) {
         console.warn("Telegram está pendiente de configurar mediante un servidor seguro.");
         return;
@@ -39,17 +55,18 @@ async function enviarAlertaTelegram(mensaje) {
         });
 
         if (!respuesta.ok) {
-            throw new Error("Error al enviar la alerta");
+            throw new Error("No se pudo enviar la alerta");
         }
 
-        console.log("Alerta enviada correctamente.");
+        console.log("Alerta enviada correctamente a Telegram.");
+
     } catch (error) {
         console.error("Error al enviar alerta:", error);
     }
 }
 
 // ==========================================
-// ESTRUCTURA DE LA GRÁFICA DE CHART.JS
+// ESTRUCTURA DE LA GRÁFICA
 // ==========================================
 
 let historialTiempos = [];
@@ -60,45 +77,20 @@ let datosNivelAgua = [];
 let datosHumedadSustrato = [];
 let datosCO2 = [];
 
-let miGrafica;
+let miGrafica = null;
+
+// ==========================================
+// INICIO DEL SISTEMA
+// ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    const canvasElement = document.getElementById('graficaSensores');
-
-    if (canvasElement) {
-        const ctx = canvasElement.getContext('2d');
-
-        miGrafica = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: historialTiempos,
-                datasets: [
-                    { label: 'Temperatura (°C)', data: datosTemperatura, borderColor: '#ef4444', tension: 0.1 },
-                    { label: 'Humedad (%)', data: datosHumedad, borderColor: '#3b82f6', tension: 0.1 },
-                    { label: 'Presión (hPa)', data: datosPresion, borderColor: '#8b5cf6', tension: 0.1 },
-                    { label: 'Nivel Agua (%)', data: datosNivelAgua, borderColor: '#06b6d4', tension: 0.1 },
-                    { label: 'Humedad Sustrato (%)', data: datosHumedadSustrato, borderColor: '#10b981', tension: 0.1 },
-                    { label: 'CO2 (ppm)', data: datosCO2, borderColor: '#f59e0b', tension: 0.1 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true }
-                }
-            }
-        });
-    }
-
-    // Primera lectura al cargar la página
     actualizarDatos();
 
     // Actualizar datos cada 60 segundos
     setInterval(actualizarDatos, 60000);
 
-    // Revisar pérdida de conexión cada 30 segundos
+    // Revisar conexión cada 30 segundos
     setInterval(verificarDesconexion, 30000);
 });
 
@@ -123,7 +115,7 @@ function simularDatos() {
 
     const datos = {
         temperatura: Number((24 + Math.random() * 3).toFixed(1)),
-        humedad: Number((80 + Math.random() * 10).toFixed(1)),
+        humedad: Number((94 + Math.random() * 2).toFixed(1)),
         presion: Number((1010 + Math.random() * 8).toFixed(1)),
         co2: Math.floor(500 + Math.random() * 200),
         humedad_sustrato: Math.floor(60 + Math.random() * 15),
@@ -140,10 +132,11 @@ function simularDatos() {
 async function obtenerDatosESP32() {
 
     try {
+
         const respuesta = await fetch(ESP32_URL);
 
         if (!respuesta.ok) {
-            throw new Error("No se recibió una respuesta válida del ESP32");
+            throw new Error("Respuesta no válida del ESP32");
         }
 
         const datos = await respuesta.json();
@@ -157,14 +150,16 @@ async function obtenerDatosESP32() {
         const estadoSistema = document.querySelector('.alert-text');
 
         if (estadoSistema) {
-            estadoSistema.innerHTML = "⚠️ ESP32 fuera de línea | Verificando conexión...";
+            estadoSistema.innerHTML =
+                "⚠️ ESP32 fuera de línea | Verificando conexión...";
+
             estadoSistema.style.color = "#f59e0b";
         }
     }
 }
 
 // ==========================================
-// PROCESAMIENTO Y ACTUALIZACIÓN DE DATOS
+// PROCESAMIENTO DE DATOS
 // ==========================================
 
 function procesarDatos(datos, esSimulacion) {
@@ -174,44 +169,30 @@ function procesarDatos(datos, esSimulacion) {
     ultimoTiempoLectura = ahora;
     alertaDesconexionEnviada = false;
 
+    const tempActual = Number(datos.temperatura);
+    const humedadActual = Number(datos.humedad);
+
     // ======================================
-    // VERIFICACIÓN DE TEMPERATURA
-    // Solo funciona con el ESP32 real
+    // SISTEMA DE ALERTAS
+    // Solo se activa con el ESP32 real
     // ======================================
 
-    let tempActual = parseFloat(datos.temperatura);
+    if (!esSimulacion) {
 
-    if (!esSimulacion && !isNaN(tempActual)) {
+        verificarTemperatura(tempActual, ahora);
 
-        if (ultimaTemperatura !== null) {
-
-            const diferenciaTemp = tempActual - ultimaTemperatura;
-
-            const minutosTranscurridos =
-                (ahora - ultimaHoraTemperatura) / 60000;
-
-            // Si la temperatura sube 3°C o más en menos de 2 minutos
-            if (diferenciaTemp >= 3.0 && minutosTranscurridos <= 2) {
-
-                enviarAlertaTelegram(
-                    `🚨 ¡ALERTA BIOCÁPSULA!\n` +
-                    `Incremento repentino de temperatura: +${diferenciaTemp.toFixed(1)}°C\n` +
-                    `Temperatura actual: ${tempActual}°C`
-                );
-            }
-        }
-
-        ultimaTemperatura = tempActual;
-        ultimaHoraTemperatura = ahora;
+        verificarHumedad(humedadActual);
     }
 
     // ======================================
     // ACTUALIZAR TARJETAS DEL HTML
     // ======================================
 
-    const elementoSensor = document.querySelector('.card-value-large');
+    const elementoSensor =
+        document.querySelector('.card-value-large');
 
-    const estadoSistema = document.querySelector('.alert-text');
+    const estadoSistema =
+        document.querySelector('.alert-text');
 
     if (elementoSensor) {
 
@@ -242,23 +223,28 @@ function procesarDatos(datos, esSimulacion) {
     if (estadoSistema) {
 
         if (esSimulacion) {
+
             estadoSistema.innerHTML =
                 "🧪 Modo simulación activo | Datos ficticios";
+
             estadoSistema.style.color = "#3b82f6";
+
         } else {
+
             estadoSistema.innerHTML =
                 "✅ ESP32 en línea | Transmitiendo datos";
+
             estadoSistema.style.color = "#22c55e";
         }
     }
 
     // ======================================
-    // REGISTRAR HISTORIAL PARA GRÁFICA
+    // REGISTRO DEL HISTORIAL
     // ======================================
 
-    let horaActual = new Date().toLocaleTimeString();
+    const horaActual = new Date().toLocaleTimeString();
 
-    if (historialTiempos.length > 20) {
+    if (historialTiempos.length >= 20) {
 
         historialTiempos.shift();
         datosTemperatura.shift();
@@ -284,28 +270,262 @@ function procesarDatos(datos, esSimulacion) {
 }
 
 // ==========================================
-// DETECCIÓN AUTOMÁTICA DE PÉRDIDA DE CONEXIÓN
+// VERIFICACIÓN DE TEMPERATURA
+// ==========================================
+
+function verificarTemperatura(tempActual, ahora) {
+
+    if (!Number.isFinite(tempActual)) return;
+
+    // Temperatura inferior a 21 °C
+    if (tempActual < TEMPERATURA_MINIMA) {
+
+        if (!alertasActivas.temperaturaBaja) {
+
+            enviarAlertaTelegram(
+                `🥶 ALERTA BIOCÁPSULA\n` +
+                `Temperatura demasiado baja.\n` +
+                `Temperatura actual: ${tempActual} °C\n` +
+                `Mínimo permitido: ${TEMPERATURA_MINIMA} °C`
+            );
+
+            alertasActivas.temperaturaBaja = true;
+        }
+
+    } else {
+        alertasActivas.temperaturaBaja = false;
+    }
+
+    // Temperatura superior a 27 °C
+    if (tempActual > TEMPERATURA_MAXIMA) {
+
+        if (!alertasActivas.temperaturaAlta) {
+
+            enviarAlertaTelegram(
+                `🔥 ALERTA BIOCÁPSULA\n` +
+                `Temperatura demasiado alta.\n` +
+                `Temperatura actual: ${tempActual} °C\n` +
+                `Máximo permitido: ${TEMPERATURA_MAXIMA} °C`
+            );
+
+            alertasActivas.temperaturaAlta = true;
+        }
+
+    } else {
+        alertasActivas.temperaturaAlta = false;
+    }
+
+    // ======================================
+    // CAMBIO REPENTINO DE TEMPERATURA
+    // ======================================
+
+    if (ultimaTemperatura !== null && ultimaHoraTemperatura !== null) {
+
+        const diferenciaTemp = tempActual - ultimaTemperatura;
+
+        const minutosTranscurridos =
+            (ahora - ultimaHoraTemperatura) / 60000;
+
+        if (diferenciaTemp >= 3.0 && minutosTranscurridos <= 2) {
+
+            if (!alertasActivas.cambioRepentino) {
+
+                enviarAlertaTelegram(
+                    `🚨 ALERTA BIOCÁPSULA\n` +
+                    `Incremento repentino de temperatura.\n` +
+                    `Aumento: +${diferenciaTemp.toFixed(1)} °C\n` +
+                    `Temperatura actual: ${tempActual} °C`
+                );
+
+                alertasActivas.cambioRepentino = true;
+            }
+
+        } else {
+            alertasActivas.cambioRepentino = false;
+        }
+    }
+
+    ultimaTemperatura = tempActual;
+    ultimaHoraTemperatura = ahora;
+}
+
+// ==========================================
+// VERIFICACIÓN DE HUMEDAD AMBIENTAL
+// ==========================================
+
+function verificarHumedad(humedadActual) {
+
+    if (!Number.isFinite(humedadActual)) return;
+
+    // Humedad inferior a 95 %
+    if (humedadActual < HUMEDAD_DESEADA) {
+
+        if (!alertasActivas.humedadBaja) {
+
+            enviarAlertaTelegram(
+                `💧 ALERTA BIOCÁPSULA\n` +
+                `Humedad ambiental inferior a la deseada.\n` +
+                `Humedad actual: ${humedadActual} %\n` +
+                `Humedad deseada: ${HUMEDAD_DESEADA} %`
+            );
+
+            alertasActivas.humedadBaja = true;
+        }
+
+    } else {
+        alertasActivas.humedadBaja = false;
+    }
+
+    // Humedad superior a 95 %
+    if (humedadActual > HUMEDAD_DESEADA) {
+
+        if (!alertasActivas.humedadAlta) {
+
+            enviarAlertaTelegram(
+                `💦 ALERTA BIOCÁPSULA\n` +
+                `Humedad ambiental superior a la deseada.\n` +
+                `Humedad actual: ${humedadActual} %\n` +
+                `Humedad deseada: ${HUMEDAD_DESEADA} %`
+            );
+
+            alertasActivas.humedadAlta = true;
+        }
+
+    } else {
+        alertasActivas.humedadAlta = false;
+    }
+}
+
+// ==========================================
+// DETECCIÓN DE PÉRDIDA DE CONEXIÓN
 // ==========================================
 
 function verificarDesconexion() {
 
-    // No revisar desconexiones cuando se utilizan datos simulados
-    if (MODO_SIMULACION) {
-        return;
-    }
+    if (MODO_SIMULACION) return;
 
     const tiempoSinDatosSegundos =
         (Date.now() - ultimoTiempoLectura) / 1000;
 
-    // Si pasan más de 60 segundos sin recibir respuesta
     if (tiempoSinDatosSegundos > 60 && !alertaDesconexionEnviada) {
 
         enviarAlertaTelegram(
-            `⚠️ ¡ALERTA BIOCÁPSULA!\n` +
-            `Se ha perdido la conexión con el ESP32. No se han recibido datos en más de 1 minuto.`
+            `⚠️ ALERTA BIOCÁPSULA\n` +
+            `Se ha perdido la conexión con el ESP32.\n` +
+            `No se han recibido datos en más de 1 minuto.`
         );
 
         alertaDesconexionEnviada = true;
+    }
+}
+
+// ==========================================
+// CREAR GRÁFICA
+// ==========================================
+
+function crearGrafica() {
+
+    const canvasElement = document.getElementById('graficaSensores');
+
+    if (!canvasElement || miGrafica) return;
+
+    const ctx = canvasElement.getContext('2d');
+
+    miGrafica = new Chart(ctx, {
+        type: 'line',
+
+        data: {
+            labels: historialTiempos,
+
+            datasets: [
+                {
+                    label: 'Temperatura (°C)',
+                    data: datosTemperatura,
+                    borderColor: '#ef4444',
+                    tension: 0.1
+                },
+                {
+                    label: 'Humedad (%)',
+                    data: datosHumedad,
+                    borderColor: '#3b82f6',
+                    tension: 0.1
+                },
+                {
+                    label: 'Presión (hPa)',
+                    data: datosPresion,
+                    borderColor: '#8b5cf6',
+                    tension: 0.1
+                },
+                {
+                    label: 'Nivel Agua (%)',
+                    data: datosNivelAgua,
+                    borderColor: '#06b6d4',
+                    tension: 0.1
+                },
+                {
+                    label: 'Humedad Sustrato (%)',
+                    data: datosHumedadSustrato,
+                    borderColor: '#10b981',
+                    tension: 0.1
+                },
+                {
+                    label: 'CO2 (ppm)',
+                    data: datosCO2,
+                    borderColor: '#f59e0b',
+                    tension: 0.1
+                }
+            ]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// ==========================================
+// NAVEGACIÓN ENTRE SECCIONES
+// ==========================================
+
+function mostrarSeccion(event, seccion) {
+
+    event.preventDefault();
+
+    const inicio = document.getElementById('seccion-inicio');
+    const graficas = document.getElementById('seccion-graficas');
+
+    const btnInicio = document.getElementById('btn-inicio');
+    const btnGraficas = document.getElementById('btn-graficas');
+
+    if (seccion === 'inicio') {
+
+        inicio.style.display = 'block';
+        graficas.style.display = 'none';
+
+        btnInicio.classList.add('active');
+        btnGraficas.classList.remove('active');
+
+    } else if (seccion === 'graficas') {
+
+        inicio.style.display = 'none';
+        graficas.style.display = 'block';
+
+        btnGraficas.classList.add('active');
+        btnInicio.classList.remove('active');
+
+        crearGrafica();
+
+        if (miGrafica) {
+            miGrafica.resize();
+            miGrafica.update();
+        }
     }
 }
 
@@ -316,6 +536,7 @@ function verificarDesconexion() {
 function descargarExcel() {
 
     if (historialTiempos.length === 0) {
+
         alert("No hay datos registrados todavía para exportar.");
         return;
     }
@@ -349,40 +570,4 @@ function descargarExcel() {
         libro,
         "Reporte_Biocapsula_Sensores.xlsx"
     );
-}
-// ==========================================
-// NAVEGACIÓN ENTRE SECCIONES
-// ==========================================
-
-function mostrarSeccion(event, seccion) {
-
-    event.preventDefault();
-
-    const inicio = document.getElementById('seccion-inicio');
-    const graficas = document.getElementById('seccion-graficas');
-
-    const btnInicio = document.getElementById('btn-inicio');
-    const btnGraficas = document.getElementById('btn-graficas');
-
-    if (seccion === 'inicio') {
-
-        inicio.style.display = 'block';
-        graficas.style.display = 'none';
-
-        btnInicio.classList.add('active');
-        btnGraficas.classList.remove('active');
-
-    } else if (seccion === 'graficas') {
-
-        inicio.style.display = 'none';
-        graficas.style.display = 'block';
-
-        btnGraficas.classList.add('active');
-        btnInicio.classList.remove('active');
-
-        if (miGrafica) {
-            miGrafica.resize();
-            miGrafica.update();
-        }
-    }
 }
