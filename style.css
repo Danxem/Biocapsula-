@@ -1,3 +1,4 @@
+
 body {
     background-color: #0b0f19;
     color: #ffffff;
@@ -161,4 +162,103 @@ body {
 
 .alert-text {
     color: #f59e0b;
+}
+
+/* ================================= */
+/*             GRÁFICAS              */
+/* ================================= */
+
+.graficas-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1rem 2rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+}
+
+.grafica-card {
+    background-color: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    min-width: 0;
+}
+
+.grafica-card h3 {
+    color: #ffffff;
+    font-size: 1rem;
+    margin: 0 0 0.5rem;
+}
+
+.grafica-descripcion {
+    color: #94a3b8;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.grafica-contenedor {
+    position: relative;
+    width: 100%;
+    height: 260px;
+}
+
+.grafica-estado {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    text-align: left;
+}
+
+.grafica-estado span {
+    font-weight: bold;
+}
+
+.estado-normal {
+    color: #22c55e;
+}
+
+.estado-bajo {
+    color: #38bdf8;
+}
+
+.estado-alto {
+    color: #f43f5e;
+}
+
+.boton-exportar {
+    background-color: #0ea5e9;
+    color: #ffffff;
+    border: none;
+    padding: 0.8rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    margin: 1rem auto 2rem;
+    display: block;
+}
+
+.boton-exportar:hover {
+    background-color: #0284c7;
+}
+
+@media (max-width: 700px) {
+    .graficas-container {
+        grid-template-columns: 1fr;
+    }
+
+    .navbar {
+        padding: 0.8rem 1rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .nav-links {
+        gap: 0.3rem;
+    }
+
+    .grafica-contenedor {
+        height: 230px;
+    }
 }

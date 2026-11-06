@@ -19,6 +19,13 @@ const TEMPERATURA_MINIMA = 21;
 const TEMPERATURA_MAXIMA = 27;
 const HUMEDAD_DESEADA = 95;
 
+// Referencias para las gráficas
+const TEMPERATURA_SETPOINT = 24;
+const HUMEDAD_MINIMA_GRAFICA = 85;
+const HUMEDAD_SETPOINT_GRAFICA = 90;
+const HUMEDAD_MAXIMA_GRAFICA = 95;
+const CO2_MAXIMO_SENSOR = 5000;
+
 // Variables de monitoreo
 let ultimaTemperatura = null;
 let ultimaHoraTemperatura = null;
@@ -77,7 +84,15 @@ let datosNivelAgua = [];
 let datosHumedadSustrato = [];
 let datosCO2 = [];
 
-let miGrafica = null;
+// Instancias independientes de las seis gráficas
+let graficas = {
+    temperatura: null,
+    humedad: null,
+    co2: null,
+    sustrato: null,
+    presion: null,
+    nivelAgua: null
+};
 
 // ==========================================
 // INICIO DEL SISTEMA
@@ -264,9 +279,8 @@ function procesarDatos(datos, esSimulacion) {
     datosHumedadSustrato.push(Number(datos.humedad_sustrato) || 0);
     datosCO2.push(Number(datos.co2) || 0);
 
-    if (miGrafica) {
-        miGrafica.update();
-    }
+    actualizarGraficas();
+    actualizarEstadosGraficas(datos);
 }
 
 // ==========================================
@@ -423,71 +437,273 @@ function verificarDesconexion() {
 // CREAR GRÁFICA
 // ==========================================
 
-function crearGrafica() {
+// Crear una gráfica individual
+function crearGraficaIndividual(id, nombre, color, datos, unidad, opciones = {}) {
 
-    const canvasElement = document.getElementById('graficaSensores');
+    const contexto = document.getElementById(id).getContext('2d');
 
-    if (!canvasElement || miGrafica) return;
+    const conjuntos = [{
+        label: nombre,
+        data: datos,
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 2,
+        tension: 0.3,
+        fill: false
+    }];
 
-    const ctx = canvasElement.getContext('2d');
+    // Agregar líneas de referencia cuando existan
+    if (opciones.minimo !== undefined) {
+        conjuntos.push({
+            label: 'Mínimo',
+            data: Array(historialTiempos.length).fill(opciones.minimo),
+            borderColor: 'red',
+            borderDash: [5, 5],
+            borderWidth: 1,
+            pointRadius: 0
+        });
+    }
 
-    miGrafica = new Chart(ctx, {
+    if (opciones.setpoint !== undefined) {
+        conjuntos.push({
+            label: 'Setpoint',
+            data: Array(historialTiempos.length).fill(opciones.setpoint),
+            borderColor: 'green',
+            borderDash: [5, 5],
+            borderWidth: 2,
+            pointRadius: 0
+        });
+    }
+
+    if (opciones.maximo !== undefined) {
+        conjuntos.push({
+            label: 'Máximo',
+            data: Array(historialTiempos.length).fill(opciones.maximo),
+            borderColor: 'red',
+            borderDash: [5, 5],
+            borderWidth: 1,
+            pointRadius: 0
+        });
+    }
+
+    return new Chart(contexto, {
         type: 'line',
-
         data: {
             labels: historialTiempos,
-
-            datasets: [
-                {
-                    label: 'Temperatura (°C)',
-                    data: datosTemperatura,
-                    borderColor: '#ef4444',
-                    tension: 0.1
-                },
-                {
-                    label: 'Humedad (%)',
-                    data: datosHumedad,
-                    borderColor: '#3b82f6',
-                    tension: 0.1
-                },
-                {
-                    label: 'Presión (hPa)',
-                    data: datosPresion,
-                    borderColor: '#8b5cf6',
-                    tension: 0.1
-                },
-                {
-                    label: 'Nivel Agua (%)',
-                    data: datosNivelAgua,
-                    borderColor: '#06b6d4',
-                    tension: 0.1
-                },
-                {
-                    label: 'Humedad Sustrato (%)',
-                    data: datosHumedadSustrato,
-                    borderColor: '#10b981',
-                    tension: 0.1
-                },
-                {
-                    label: 'CO2 (ppm)',
-                    data: datosCO2,
-                    borderColor: '#f59e0b',
-                    tension: 0.1
-                }
-            ]
+            datasets: conjuntos
         },
-
         options: {
             responsive: true,
             maintainAspectRatio: false,
-
+            animation: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff'
+                    }
+                }
+            },
             scales: {
+                x: {
+                    ticks: {
+                        color: '#ffffff'
+                    }
+                },
                 y: {
-                    beginAtZero: true
+                    beginAtZero: opciones.minCero || false,
+                    min: opciones.min,
+                    max: opciones.max,
+                    title: {
+                        display: true,
+                        text: unidad,
+                        color: '#ffffff'
+                    },
+                    ticks: {
+                        color: '#ffffff'
+                    }
                 }
             }
         }
     });
+}
+
+
+// Crear las seis gráficas
+function crearGraficas() {
+
+    if (graficas.temperatura) return;
+
+    graficas.temperatura = crearGraficaIndividual(
+        'graficaTemperatura',
+        'Temperatura',
+        '#38bdf8',
+        datosTemperatura,
+        'Temperatura (°C)',
+        {
+            minimo: TEMPERATURA_MINIMA,
+            setpoint: TEMPERATURA_SETPOINT,
+            maximo: TEMPERATURA_MAXIMA
+        }
+    );
+
+    graficas.humedad = crearGraficaIndividual(
+        'graficaHumedad',
+        'Humedad',
+        '#38bdf8',
+        datosHumedad,
+        'Humedad (%)',
+        {
+            minimo: HUMEDAD_MINIMA_GRAFICA,
+            setpoint: HUMEDAD_SETPOINT_GRAFICA,
+            maximo: HUMEDAD_MAXIMA_GRAFICA
+        }
+    );
+
+    graficas.co2 = crearGraficaIndividual(
+        'graficaCO2',
+        'CO₂',
+        '#38bdf8',
+        datosCO2,
+        'CO₂ (ppm)',
+        {
+            min: 0,
+            max: CO2_MAXIMO_SENSOR
+        }
+    );
+
+    graficas.sustrato = crearGraficaIndividual(
+        'graficaSustrato',
+        'Humedad del sustrato',
+        '#38bdf8',
+        datosHumedadSustrato,
+        'Humedad (%)',
+        {
+            min: 0,
+            max: 100
+        }
+    );
+
+    graficas.presion = crearGraficaIndividual(
+        'graficaPresion',
+        'Presión',
+        '#38bdf8',
+        datosPresion,
+        'Presión'
+    );
+
+    graficas.nivelAgua = crearGraficaIndividual(
+        'graficaNivelAgua',
+        'Nivel de agua',
+        '#38bdf8',
+        datosNivelAgua,
+        'Nivel (%)',
+        {
+            min: 0,
+            max: 100
+        }
+    );
+}
+
+
+// Actualizar las gráficas con los nuevos datos
+function actualizarGraficas() {
+
+    Object.values(graficas).forEach(grafica => {
+
+        if (grafica) {
+            grafica.data.labels = historialTiempos;
+
+            grafica.data.datasets[0].data =
+                grafica === graficas.temperatura ? datosTemperatura :
+                grafica === graficas.humedad ? datosHumedad :
+                grafica === graficas.co2 ? datosCO2 :
+                grafica === graficas.sustrato ? datosHumedadSustrato :
+                grafica === graficas.presion ? datosPresion :
+                datosNivelAgua;
+
+            // Mantener actualizadas las líneas de referencia
+            if (grafica === graficas.temperatura) {
+                grafica.data.datasets[1].data =
+                    Array(historialTiempos.length).fill(TEMPERATURA_MINIMA);
+
+                grafica.data.datasets[2].data =
+                    Array(historialTiempos.length).fill(TEMPERATURA_SETPOINT);
+
+                grafica.data.datasets[3].data =
+                    Array(historialTiempos.length).fill(TEMPERATURA_MAXIMA);
+            }
+
+            if (grafica === graficas.humedad) {
+                grafica.data.datasets[1].data =
+                    Array(historialTiempos.length).fill(HUMEDAD_MINIMA_GRAFICA);
+
+                grafica.data.datasets[2].data =
+                    Array(historialTiempos.length).fill(HUMEDAD_SETPOINT_GRAFICA);
+
+                grafica.data.datasets[3].data =
+                    Array(historialTiempos.length).fill(HUMEDAD_MAXIMA_GRAFICA);
+            }
+
+            grafica.update();
+        }
+    });
+}
+
+
+// Actualizar los indicadores de estado
+function actualizarEstadosGraficas(datos) {
+
+    const temperatura = Number(datos.temperatura);
+    const humedad = Number(datos.humedad);
+    const co2 = Number(datos.co2);
+
+    const estadoTemperatura = document.getElementById('estadoTemperatura');
+    const estadoHumedad = document.getElementById('estadoHumedad');
+    const estadoCO2 = document.getElementById('estadoCO2');
+
+    if (estadoTemperatura) {
+
+        if (temperatura < TEMPERATURA_MINIMA) {
+            estadoTemperatura.textContent = 'Temperatura baja';
+            estadoTemperatura.className = 'grafica-estado estado-bajo';
+        }
+        else if (temperatura > TEMPERATURA_MAXIMA) {
+            estadoTemperatura.textContent = 'Temperatura alta';
+            estadoTemperatura.className = 'grafica-estado estado-alto';
+        }
+        else {
+            estadoTemperatura.textContent = 'Temperatura normal';
+            estadoTemperatura.className = 'grafica-estado estado-normal';
+        }
+    }
+
+    if (estadoHumedad) {
+
+        if (humedad < HUMEDAD_MINIMA_GRAFICA) {
+            estadoHumedad.textContent = 'Humedad baja';
+            estadoHumedad.className = 'grafica-estado estado-bajo';
+        }
+        else if (humedad > HUMEDAD_MAXIMA_GRAFICA) {
+            estadoHumedad.textContent = 'Humedad alta';
+            estadoHumedad.className = 'grafica-estado estado-alto';
+        }
+        else {
+            estadoHumedad.textContent = 'Humedad normal';
+            estadoHumedad.className = 'grafica-estado estado-normal';
+        }
+    }
+
+    if (estadoCO2) {
+
+        if (co2 < 0 || co2 > CO2_MAXIMO_SENSOR) {
+            estadoCO2.textContent = 'Fuera del rango del sensor';
+            estadoCO2.className = 'grafica-estado estado-alto';
+        }
+        else {
+            estadoCO2.textContent = 'Monitoreando CO₂';
+            estadoCO2.className = 'grafica-estado estado-normal';
+        }
+    }
 }
 
 // ==========================================
@@ -496,10 +712,12 @@ function crearGrafica() {
 
 function mostrarSeccion(event, seccion) {
 
-    event.preventDefault();
+    if (event) {
+        event.preventDefault();
+    }
 
     const inicio = document.getElementById('seccion-inicio');
-    const graficas = document.getElementById('seccion-graficas');
+    const seccionGraficas = document.getElementById('seccion-graficas');
 
     const btnInicio = document.getElementById('btn-inicio');
     const btnGraficas = document.getElementById('btn-graficas');
@@ -507,25 +725,36 @@ function mostrarSeccion(event, seccion) {
     if (seccion === 'inicio') {
 
         inicio.style.display = 'block';
-        graficas.style.display = 'none';
+        seccionGraficas.style.display = 'none';
 
         btnInicio.classList.add('active');
         btnGraficas.classList.remove('active');
 
-    } else if (seccion === 'graficas') {
+    }
+
+    else if (seccion === 'graficas') {
 
         inicio.style.display = 'none';
-        graficas.style.display = 'block';
+        seccionGraficas.style.display = 'block';
 
         btnGraficas.classList.add('active');
         btnInicio.classList.remove('active');
 
-        crearGrafica();
+        crearGraficas();
 
-        if (miGrafica) {
-            miGrafica.resize();
-            miGrafica.update();
-        }
+        setTimeout(() => {
+
+            Object.values(graficas).forEach(grafica => {
+
+                if (grafica) {
+                    grafica.resize();
+                    grafica.update();
+                }
+
+            });
+
+        }, 100);
+
     }
 }
 

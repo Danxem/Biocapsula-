@@ -99,11 +99,11 @@
                 <div class="card large-card wide-card">
                     <div class="card-title">
                         <i class="fa-solid fa-gauge"></i>
-                        Sensor MHZ-19 (Dioxido de Carbono (CO2))
+                        Sensor MHZ-19 (Dióxido de Carbono (CO₂))
                     </div>
 
                     <div class="card-value-large">
-                        <span id="CO2">--</span> <span class="unit">CO2</span>
+                        <span id="CO2">--</span> <span class="unit">ppm</span>
                     </div>
 
                     <div class="card-footer-text">Interior de la Biocápsula</div>
@@ -119,20 +119,20 @@
                         <span id="sustrato">--</span> <span class="unit">%</span>
                     </div>
 
-                    <div class="card-footer-text">Interior y Exterior del Hongo</div>
+                    <div class="card-footer-text">Interior del sustrato</div>
                 </div>
 
                 <div class="card large-card wide-card">
                     <div class="card-title">
                         <i class="fa-solid fa-gauge"></i>
-                        Sensor Flotador (Nivel de agua)
+                        Sensor Flotador (Nivel de Agua)
                     </div>
 
                     <div class="card-value-large">
                         <span id="nivel_agua">--</span> <span class="unit">%</span>
                     </div>
 
-                    <div class="card-footer-text">Deposito de Agua de la Biocápsula</div>
+                    <div class="card-footer-text">Depósito de Agua de la Biocápsula</div>
                 </div>
 
             </div>
@@ -145,23 +145,148 @@
 
     <div id="seccion-graficas" style="display: none; padding: 20px;">
 
-        <div class="card large-card wide-card" style="margin: 0 auto; max-width: 1000px;">
+        <header class="dashboard-header">
+            <h1>Gráficas e Historial</h1>
+            <p>Monitoreo independiente de las variables ambientales</p>
+        </header>
 
-            <div class="card-title">
-                <i class="fa-solid fa-chart-line"></i>
-                Historial y Gráficas en Tiempo Real
+        <div class="graficas-container">
+
+            <!-- GRÁFICA DE TEMPERATURA -->
+
+            <div class="grafica-card">
+                <h3>
+                    <i class="fa-solid fa-temperature-half"></i>
+                    Temperatura
+                </h3>
+
+                <div class="grafica-descripcion">
+                    Sensor DHT22 | Unidad: °C
+                </div>
+
+                <div class="grafica-contenedor">
+                    <canvas id="graficaTemperatura"></canvas>
+                </div>
+
+                <div class="grafica-estado" id="estadoTemperatura">
+                    Estado: Esperando datos...
+                </div>
             </div>
 
-            <div style="position: relative; height:350px; width:100%; margin-bottom: 20px;">
-                <canvas id="graficaSensores"></canvas>
+            <!-- GRÁFICA DE HUMEDAD AMBIENTAL -->
+
+            <div class="grafica-card">
+                <h3>
+                    <i class="fa-solid fa-droplet"></i>
+                    Humedad Ambiental
+                </h3>
+
+                <div class="grafica-descripcion">
+                    Sensor DHT22 | Unidad: %
+                </div>
+
+                <div class="grafica-contenedor">
+                    <canvas id="graficaHumedad"></canvas>
+                </div>
+
+                <div class="grafica-estado" id="estadoHumedad">
+                    Estado: Esperando datos...
+                </div>
             </div>
 
-            <button onclick="descargarExcel()" style="background-color: #22c55e; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
-                <i class="fa-solid fa-file-excel"></i>
-                Descargar Reporte en Excel
-            </button>
+            <!-- GRÁFICA DE CO2 -->
+
+            <div class="grafica-card">
+                <h3>
+                    <i class="fa-solid fa-cloud"></i>
+                    Dióxido de Carbono (CO₂)
+                </h3>
+
+                <div class="grafica-descripcion">
+                    Sensor MH-Z19C | Rango de medición: 0 a 5000 ppm
+                </div>
+
+                <div class="grafica-contenedor">
+                    <canvas id="graficaCO2"></canvas>
+                </div>
+
+                <div class="grafica-estado" id="estadoCO2">
+                    Estado: Monitoreo
+                </div>
+            </div>
+
+            <!-- GRÁFICA DE HUMEDAD DEL SUSTRATO -->
+
+            <div class="grafica-card">
+                <h3>
+                    <i class="fa-solid fa-seedling"></i>
+                    Humedad del Sustrato
+                </h3>
+
+                <div class="grafica-descripcion">
+                    Unidad: % | Lectura del sensor
+                </div>
+
+                <div class="grafica-contenedor">
+                    <canvas id="graficaSustrato"></canvas>
+                </div>
+
+                <div class="grafica-estado" id="estadoSustrato">
+                    Estado: Monitoreo
+                </div>
+            </div>
+
+            <!-- GRÁFICA DE PRESIÓN -->
+
+            <div class="grafica-card">
+                <h3>
+                    <i class="fa-solid fa-gauge"></i>
+                    Presión Atmosférica
+                </h3>
+
+                <div class="grafica-descripcion">
+                    Sensor BMP280 | Unidad: hPa
+                </div>
+
+                <div class="grafica-contenedor">
+                    <canvas id="graficaPresion"></canvas>
+                </div>
+
+                <div class="grafica-estado" id="estadoPresion">
+                    Estado: Monitoreo
+                </div>
+            </div>
+
+            <!-- GRÁFICA DE NIVEL DE AGUA -->
+
+            <div class="grafica-card">
+                <h3>
+                    <i class="fa-solid fa-water"></i>
+                    Nivel de Agua
+                </h3>
+
+                <div class="grafica-descripcion">
+                    Sensor flotador | Unidad: %
+                </div>
+
+                <div class="grafica-contenedor">
+                    <canvas id="graficaNivelAgua"></canvas>
+                </div>
+
+                <div class="grafica-estado" id="estadoNivelAgua">
+                    Estado: Monitoreo
+                </div>
+            </div>
 
         </div>
+
+        <!-- BOTÓN DE EXPORTACIÓN -->
+
+        <button onclick="descargarExcel()" class="boton-exportar">
+            <i class="fa-solid fa-file-excel"></i>
+            Descargar Reporte en Excel
+        </button>
+
     </div>
 
     <!-- ======================================
